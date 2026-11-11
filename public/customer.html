@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sufi Amanda</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/" class="brand" id="brand"></a>
+      <div class="muted small" id="tagline"></div>
+    </div>
+    <button class="btn primary" id="cartBtn">Cart <span class="badge" id="cartCount">0</span></button>
+  </header>
+
+  <div class="banner" id="storeBanner" hidden></div>
+  <nav class="chips" id="categories"></nav>
+  <main class="grid" id="products"><p class="muted">Loading…</p></main>
+
+  <!-- Cart and checkout drawer -->
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-panel">
+      <div class="drawer-head"><h2>Your cart</h2><button class="btn ghost" id="closeCart" aria-label="Close">✕</button></div>
+      <div id="cartItems"></div>
+      <div class="totals" id="cartTotals"></div>
+
+      <form id="checkout" class="form">
+        <h3>Your details</h3>
+        <label>Name <input name="customer_name" required autocomplete="name"></label>
+        <label>Phone number <input name="phone" required type="tel" placeholder="01X-XXXXXXX" autocomplete="tel"></label>
+        <fieldset class="seg">
+          <label><input type="radio" name="method" value="delivery" checked> Delivery</label>
+          <label><input type="radio" name="method" value="pickup"> Self pickup</label>
+        </fieldset>
+        <div id="deliveryFields">
+          <label>Delivery address <textarea name="address" rows="3" placeholder="House no, street, area, postcode, city"></textarea></label>
+          <button type="button" class="btn ghost small" id="locBtn">📍 Share my current location</button>
+          <span class="muted small" id="locStatus"></span>
+          <input type="hidden" name="lat"><input type="hidden" name="lng">
+        </div>
+        <label>Notes (optional) <input name="notes" placeholder="e.g. less sugar, call when arrive"></label>
+        <p class="cod">💵 Payment: <strong>Cash on Delivery (COD) only</strong>. Pay when you receive your order.</p>
+        <button class="btn primary block" type="submit" id="placeBtn">Place order</button>
+      </form>
+    </div>
+  </aside>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/customer.js"></script>
+</body>
+</html>

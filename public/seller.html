@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seller dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <section id="login" class="login">
+    <form class="form card-box" id="loginForm">
+      <h1 id="loginTitle">Seller login</h1>
+      <label>Password <input type="password" name="password" required autofocus></label>
+      <button class="btn primary block">Log in</button>
+      <p class="muted small"><a id="shopLink" href="/">View the shop</a></p>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div><span class="brand" id="brand"></span> <span class="muted small">Seller dashboard</span></div>
+      <div class="row"><a class="btn ghost small" id="viewShop" target="_blank">View shop ↗</a><button class="btn ghost small" id="logout">Log out</button></div>
+    </header>
+    <nav class="tabs">
+      <button data-tab="products" class="on">Products</button>
+      <button data-tab="orders">Orders <span class="badge" id="pendingCount" hidden></span></button>
+      <button data-tab="sales">Sales &amp; income</button>
+      <button data-tab="discount">Discounts</button>
+    </nav>
+
+    <!-- PRODUCTS -->
+    <section data-panel="products" class="panel">
+      <div class="row between"><h2 id="productsHeading">Products</h2><button class="btn primary" id="newProduct">+ Add product</button></div>
+      <div class="table-wrap"><table class="table" id="productTable"></table></div>
+    </section>
+
+    <!-- ORDERS -->
+    <section data-panel="orders" class="panel" hidden>
+      <div class="row between"><h2>Orders</h2>
+        <select id="orderFilter">
+          <option value="">All orders</option><option value="pending" selected>Pending</option>
+          <option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div id="orderList" class="orders"></div>
+    </section>
+
+    <!-- SALES -->
+    <section data-panel="sales" class="panel" hidden>
+      <div class="row between wrap"><h2>Sales audit</h2>
+        <form id="salesRange" class="row wrap">
+          <label class="inline">From <input type="date" name="from"></label>
+          <label class="inline">To <input type="date" name="to"></label>
+          <button class="btn ghost small">Apply</button>
+        </form>
+      </div>
+      <div class="stats" id="stats"></div>
+      <h3>What has been sold</h3>
+      <div class="table-wrap"><table class="table" id="soldTable"></table></div>
+      <h3>Income by day</h3>
+      <div class="table-wrap"><table class="table" id="dailyTable"></table></div>
+      <p class="muted small">Income counts orders marked <strong>Completed</strong>, meaning the cash has been collected. Pending and confirmed orders show as expected COD.</p>
+    </section>
+
+    <!-- DISCOUNT -->
+    <section data-panel="discount" class="panel" hidden>
+      <h2>Discount for all products</h2>
+      <p class="muted">This applies to every product that does not have its own discount. To give a discount to one product only, edit that product in the Products tab.</p>
+      <form id="storeDiscount" class="form narrow">
+        <div class="row">
+          <select name="discount_type"><option value="none">No discount</option><option value="percent">Percentage (%)</option><option value="rm">Amount (RM)</option></select>
+          <input name="discount_value" type="number" step="0.01" min="0" placeholder="Value">
+        </div>
+        <label class="check"><input type="checkbox" name="override_individual"> Also remove individual product discounts, so this one applies to every product</label>
+        <button class="btn primary">Save discount</button>
+      </form>
+    </section>
+  </div>
+
+  <!-- PRODUCT FORM -->
+  <dialog id="productDialog">
+    <form id="productForm" class="form" method="dialog">
+      <h2 id="formTitle">Add product</h2>
+      <input type="hidden" name="id">
+      <div class="two">
+        <label>Name <input name="name" required></label>
+        <label>Category <input name="category" id="categoryInput" list="categoryList"></label>
+        <datalist id="categoryList"></datalist>
+      </div>
+      <div class="two">
+        <label>Price (RM) <input name="price" type="number" step="0.01" min="0" required></label>
+        <label>Image <input name="image" type="file" accept="image/*" id="imageInput"></label>
+      </div>
+      <img id="imagePreview" class="preview" hidden alt="">
+      <label>Description <textarea name="description" rows="3"></textarea></label>
+      <fieldset>
+        <legend>Discount for this product (optional)</legend>
+        <div class="row">
+          <select name="discount_type"><option value="none">No discount</option><option value="percent">Percentage (%)</option><option value="rm">Amount (RM)</option></select>
+          <input name="discount_value" type="number" step="0.01" min="0" placeholder="Value">
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend><span id="variantLegend">Colour variants</span> and stock</legend>
+        <div id="variantRows"></div>
+        <button type="button" class="btn ghost small" id="addVariant">+ Add <span id="variantWord">colour</span></button>
+      </fieldset>
+      <div class="row end">
+        <button type="button" class="btn ghost" id="cancelProduct">Cancel</button>
+        <button type="submit" class="btn primary" id="saveProduct" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/seller.js"></script>
+</body>
+</html>

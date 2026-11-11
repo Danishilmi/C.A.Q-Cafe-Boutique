@@ -1,0 +1,18 @@
+{
+  "name": "caq-cafe-boutique",
+  "version": "0.1.0",
+  "description": "Cafe and boutique ordering system with seller dashboards (COD only, RM pricing)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --watch --disable-warning=ExperimentalWarning server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "multer": "^2.5.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  }
+}
