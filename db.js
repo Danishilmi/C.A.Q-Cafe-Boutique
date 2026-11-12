@@ -1,87 +1,55 @@
-// Database setup using Node's built-in SQLite (Node 22.13+), so there is nothing native to compile.
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
-const fs = require('fs');
+// Database access. Every read and write goes through a Postgres function defined in
+// supabase/migrations, so the same code works two ways:
+//   1. SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY: calls the functions with supabase.rpc() over HTTPS.
+//   2. DATABASE_URL: calls them over a direct Postgres connection (handy for local development).
+const { createClient } = require('@supabase/supabase-js');
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-fs.mkdirSync(DATA_DIR, { recursive: true });
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DATABASE_URL = process.env.DATABASE_URL;
 
-const db = new DatabaseSync(path.join(DATA_DIR, 'shop.db'));
-db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
+const supabase = SUPABASE_URL && SERVICE_KEY
+  ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  : null;
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS products (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  shop TEXT NOT NULL CHECK (shop IN ('boutique','cafe')),
-  name TEXT NOT NULL,
-  description TEXT DEFAULT '',
-  category TEXT DEFAULT '',
-  price_sen INTEGER NOT NULL,              -- prices stored in sen (RM x 100) to avoid rounding errors
-  image TEXT,
-  discount_type TEXT CHECK (discount_type IN ('rm','percent')),
-  discount_value REAL,
-  active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+let pool = null;
+if (!supabase) {
+  if (!DATABASE_URL) {
+    throw new Error('Database not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env (see .env.example).');
+  }
+  const { Pool } = require('pg');
+  pool = new Pool({ connectionString: DATABASE_URL });
+}
 
--- Colour variants for the boutique, options (e.g. Hot / Iced, Regular / Large) for the cafe.
-CREATE TABLE IF NOT EXISTS variants (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-  active INTEGER NOT NULL DEFAULT 1
-);
+// Our functions raise these codes for problems the customer or seller can fix.
+const STATUS_BY_CODE = { CA400: 400, CA404: 404, CA409: 409, 23514: 400, '22P02': 400 };
 
--- Store-wide discount, one row per shop. A product's own discount overrides it.
-CREATE TABLE IF NOT EXISTS settings (
-  shop TEXT PRIMARY KEY,
-  discount_type TEXT CHECK (discount_type IN ('rm','percent')),
-  discount_value REAL
-);
-INSERT OR IGNORE INTO settings (shop) VALUES ('boutique'), ('cafe');
-
-CREATE TABLE IF NOT EXISTS orders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  shop TEXT NOT NULL,
-  customer_name TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  method TEXT NOT NULL CHECK (method IN ('delivery','pickup')),
-  address TEXT,
-  lat REAL,
-  lng REAL,
-  notes TEXT,
-  subtotal_sen INTEGER NOT NULL,
-  discount_sen INTEGER NOT NULL,
-  total_sen INTEGER NOT NULL,
-  payment TEXT NOT NULL DEFAULT 'COD',
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','completed','cancelled')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS order_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id INTEGER NOT NULL,
-  variant_id INTEGER NOT NULL,
-  product_name TEXT NOT NULL,
-  variant_name TEXT NOT NULL,
-  qty INTEGER NOT NULL,
-  original_price_sen INTEGER NOT NULL,
-  unit_price_sen INTEGER NOT NULL
-);
-`);
-
-function transaction(fn) {
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const result = fn();
-    db.exec('COMMIT');
-    return result;
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
+class DbError extends Error {
+  constructor(err) {
+    super(err.message);
+    this.code = err.code;
+    this.status = STATUS_BY_CODE[err.code] || 500;
   }
 }
 
-module.exports = { db, transaction };
+async function rpc(name, params = {}) {
+  if (supabase) {
+    const { data, error } = await supabase.rpc(name, params);
+    if (error) throw new DbError(error);
+    return data;
+  }
+  const keys = Object.keys(params);
+  const args = keys.map((k, i) => `${k} => $${i + 1}`).join(', ');
+  const values = keys.map((k) => {
+    const v = params[k];
+    return v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
+  });
+  try {
+    const { rows } = await pool.query(`select public.${name}(${args}) as result`, values);
+    return rows[0].result;
+  } catch (err) {
+    throw new DbError(err);
+  }
+}
+
+module.exports = { rpc, supabase, mode: supabase ? 'supabase' : 'postgres' };

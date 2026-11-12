@@ -164,7 +164,7 @@ async function loadOrders() {
       : o.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.address)}` : null;
     return `<article class="order">
       <div class="row between"><strong>Order #${o.id}</strong><span class="status ${o.status}">${o.status}</span></div>
-      <div class="muted small">${new Date(o.created_at.replace(' ', 'T') + 'Z').toLocaleString('en-MY')}</div>
+      <div class="muted small">${new Date(o.created_at).toLocaleString('en-MY')}</div>
       <div class="profile">
         <div><span class="muted small">Customer</span><div>${esc(o.customer_name)}</div></div>
         <div><span class="muted small">Phone</span><div><a href="tel:${esc(o.phone)}">${esc(o.phone)}</a> · <a href="https://wa.me/${esc(o.phone.replace(/\D/g, '').replace(/^0/, '60'))}" target="_blank">WhatsApp</a></div></div>
