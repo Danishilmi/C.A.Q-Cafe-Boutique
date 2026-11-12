@@ -20,10 +20,12 @@ npm start
 
 Then open http://localhost:3000.
 
-Default seller passwords are `boutique123` and `cafe123`. Change them before going live:
+Default seller passwords are `boutique123` and `cafe123`. Change them before going live by creating a `.env` file in the project folder (it is git-ignored and loaded automatically by `npm start` / `npm run dev`):
 
-```bash
-BOUTIQUE_PASSWORD=your-secret CAFE_PASSWORD=another-secret npm start
+```
+BOUTIQUE_PASSWORD=your-secret
+CAFE_PASSWORD=another-secret
+PORT=3000
 ```
 
 Other settings: `PORT` (default 3000), `DATA_DIR` (database location, default `./data`), `UPLOAD_DIR` (product images, default `./uploads`).
