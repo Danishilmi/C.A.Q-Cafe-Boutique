@@ -50,11 +50,12 @@ async function api(path, { method = 'GET', body, token } = {}) {
   return data;
 }
 
-// Live updates: call `onEvent` whenever stock or orders change on the server.
-function subscribe(onEvent) {
-  const es = new EventSource(`/api/${SHOP}/stream`);
-  es.onmessage = (e) => onEvent(JSON.parse(e.data));
-  return es;
+// Live updates: run `fn` every few seconds while the page is open and visible,
+// and straight away when the person comes back to the tab.
+// (Polling works on serverless hosting such as Vercel, where a server can't push.)
+function poll(fn, ms) {
+  setInterval(() => { if (document.visibilityState === 'visible') fn(); }, ms);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fn(); });
 }
 
 function toast(msg, kind = 'ok') {

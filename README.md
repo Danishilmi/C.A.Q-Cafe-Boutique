@@ -1,4 +1,4 @@
-# C.A.Q Cafe & Boutique
+# Sufi Amanda Cafe & Boutique
 
 A web app with four interfaces for a boutique and a cafe. Payment is **Cash on Delivery (COD) only** and all prices are in **RM**.
 
@@ -44,6 +44,19 @@ Then open http://localhost:3000. The server reads `.env` automatically.
 
 For local development without Supabase, leave the Supabase values empty and set `DATABASE_URL` to any Postgres database where you have run the migrations. Images are then saved in `./uploads`.
 
+## Deploy on Vercel
+
+The repo is ready for Vercel: `vercel.json` serves the pages from `public/` and sends `/api/...` to the Express app in `api/index.js`.
+
+1. On vercel.com, **Add New → Project**, import this GitHub repository. Leave the build settings as they are.
+2. Under **Environment Variables** add:
+   - `SUPABASE_URL`: your Supabase Project URL
+   - `SUPABASE_SERVICE_ROLE_KEY`: the service_role key
+   - `BOUTIQUE_PASSWORD` and `CAFE_PASSWORD`: the seller logins (required on Vercel; the demo passwords are turned off there)
+3. Click **Deploy**. Every push to `main` deploys again automatically.
+
+Product photos must go to Supabase Storage on Vercel (its disk is read-only), which happens automatically when the Supabase values are set. Photos are shrunk in the browser before upload to stay under Vercel's 4.5 MB request limit.
+
 ## Features
 
 ### Seller (boutique and cafe)
@@ -67,11 +80,12 @@ For local development without Supabase, leave the Supabase values empty and set 
 - `db.js`: talks to Supabase (`supabase.rpc`) or plain Postgres (`DATABASE_URL`). Every query is a function in `supabase/migrations/`, so prices and stock are always worked out in the database.
 - `storage.js`: saves product photos to the Supabase `product-images` bucket (or `./uploads` locally).
 - `public/`: plain HTML, CSS and JavaScript. `customer.html` and `seller.html` serve both shops; the URL decides which shop is shown.
-- Live updates use Server-Sent Events (`/api/:shop/stream`).
+- Live stock and new orders: the customer page checks for changes every 5 seconds and the seller dashboard every 10 seconds.
+- `api/index.js` + `vercel.json`: run the same Express app on Vercel (see below).
 
 ## Assumptions
 
 - The spec described the cafe briefly, so the cafe mirrors the boutique: same discounts, stock, orders and sales audit, with "options" instead of colours.
 - Income counts only orders marked **Completed**, meaning the cash has been collected.
 - Stock is reserved when the order is placed and returned if the seller cancels.
-- Customers do not need an account. Seller login is a simple password per shop and sessions reset when the server restarts.
+- Customers do not need an account. Seller login is a simple password per shop; a login lasts 12 hours, and changing the password logs everyone out.

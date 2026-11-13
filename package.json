@@ -1,7 +1,7 @@
 {
-  "name": "caq-cafe-boutique",
+  "name": "sufi-amanda",
   "version": "0.1.0",
-  "description": "Cafe and boutique ordering system with seller dashboards (COD only, RM pricing)",
+  "description": "Sufi Amanda cafe and boutique ordering system with seller dashboards (COD only, RM pricing)",
   "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",

@@ -8,12 +8,13 @@ const { saveImage, UPLOAD_DIR } = require('./storage');
 const PORT = process.env.PORT || 3000;
 
 // Seller passwords. Set these in .env before going live.
+// The demo passwords only work on your own computer, never on the live (Vercel) site.
+const LIVE = Boolean(process.env.VERCEL);
 const PASSWORDS = {
-  boutique: process.env.BOUTIQUE_PASSWORD || 'boutique123',
-  cafe: process.env.CAFE_PASSWORD || 'cafe123',
+  boutique: process.env.BOUTIQUE_PASSWORD || (LIVE ? null : 'boutique123'),
+  cafe: process.env.CAFE_PASSWORD || (LIVE ? null : 'cafe123'),
 };
 const SHOPS = ['boutique', 'cafe'];
-const sessions = new Map(); // token -> shop
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -30,7 +31,7 @@ app.get('/cafe/seller', page('seller.html'));
 // Images are kept in memory briefly, then saved to Supabase Storage (or the uploads folder).
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 4 * 1024 * 1024 }, // Vercel accepts at most 4.5 MB per request
   fileFilter: (req, file, cb) => cb(null, /^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)),
 });
 
@@ -44,9 +45,34 @@ function shopParam(req, res, next) {
   next();
 }
 
+// Seller login tokens are signed rather than stored, so they keep working when the
+// app runs as several serverless copies (Vercel). Changing a password logs that shop out.
+const TOKEN_HOURS = 12;
+const SECRET = process.env.SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DATABASE_URL || 'dev-only-secret';
+const sign = (shop, payload) => crypto.createHmac('sha256', `${SECRET}:${PASSWORDS[shop]}`).update(payload).digest('base64url');
+
+function makeToken(shop) {
+  const payload = Buffer.from(JSON.stringify({ shop, exp: Date.now() + TOKEN_HOURS * 3600e3 })).toString('base64url');
+  return `${payload}.${sign(shop, payload)}`;
+}
+
+function tokenShop(token) {
+  const [payload, sig] = String(token || '').split('.');
+  if (!payload || !sig) return null;
+  try {
+    const { shop, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (!SHOPS.includes(shop) || !(exp > Date.now())) return null;
+    const expected = Buffer.from(sign(shop, payload));
+    const given = Buffer.from(sig);
+    return given.length === expected.length && crypto.timingSafeEqual(given, expected) ? shop : null;
+  } catch {
+    return null;
+  }
+}
+
 function requireSeller(req, res, next) {
   const token = (req.headers.authorization || '').replace(/^Bearer /, '');
-  if (sessions.get(token) !== req.params.shop) return res.status(401).json({ error: 'Please log in as the seller' });
+  if (tokenShop(token) !== req.params.shop) return res.status(401).json({ error: 'Please log in as the seller' });
   next();
 }
 
@@ -87,22 +113,6 @@ function productFields(body) {
   };
 }
 
-// ---------- live updates (Server-Sent Events) ----------
-const listeners = { boutique: new Set(), cafe: new Set() };
-function broadcast(shop, event) {
-  const data = `data: ${JSON.stringify(event)}\n\n`;
-  for (const res of listeners[shop]) res.write(data);
-}
-
-app.get('/api/:shop/stream', shopParam, (req, res) => {
-  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-  res.flushHeaders();
-  res.write('retry: 3000\n\n');
-  listeners[req.params.shop].add(res);
-  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
-  req.on('close', () => { clearInterval(ping); listeners[req.params.shop].delete(res); });
-});
-
 // ---------- public (customer) API ----------
 app.get('/api/:shop/products', shopParam, async (req, res) => {
   res.json(await rpc('get_products', { p_shop: req.params.shop }));
@@ -132,8 +142,6 @@ app.post('/api/:shop/orders', shopParam, async (req, res) => {
     p_notes: String(b.notes || '').trim() || null,
     p_items: b.items.map((it) => ({ variant_id: Number(it.variant_id), qty: Number.parseInt(it.qty, 10) })),
   });
-  broadcast(shop, { type: 'products' });
-  broadcast(shop, { type: 'orders', newOrder: order.id });
   res.status(201).json(order);
 });
 
@@ -141,11 +149,10 @@ app.post('/api/:shop/orders', shopParam, async (req, res) => {
 app.post('/api/:shop/login', shopParam, (req, res) => {
   const given = String(req.body?.password || '');
   const expected = PASSWORDS[req.params.shop];
+  if (!expected) return res.status(503).json({ error: `Seller password not set. Add ${req.params.shop.toUpperCase()}_PASSWORD in the Vercel project settings.` });
   const ok = given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
   if (!ok) return res.status(401).json({ error: 'Wrong password' });
-  const token = crypto.randomBytes(24).toString('hex');
-  sessions.set(token, req.params.shop);
-  res.json({ token });
+  res.json({ token: makeToken(req.params.shop) });
 });
 
 app.get('/api/:shop/seller/products', shopParam, requireSeller, async (req, res) => {
@@ -167,7 +174,6 @@ async function saveProduct(req, res, id) {
     p_discount_value: f.discount.value,
     p_variants: f.variants,
   });
-  broadcast(req.params.shop, { type: 'products' });
   res.status(id ? 200 : 201).json({ id: Number(productId) });
 }
 
@@ -176,7 +182,6 @@ app.put('/api/:shop/products/:id', shopParam, requireSeller, upload.single('imag
 
 app.delete('/api/:shop/products/:id', shopParam, requireSeller, async (req, res) => {
   await rpc('remove_product', { p_shop: req.params.shop, p_id: Number(req.params.id) });
-  broadcast(req.params.shop, { type: 'products' });
   res.json({ ok: true });
 });
 
@@ -189,7 +194,6 @@ app.put('/api/:shop/discount', shopParam, requireSeller, async (req, res) => {
     p_discount_value: d.value,
     p_override_individual: Boolean(req.body?.override_individual),
   });
-  broadcast(req.params.shop, { type: 'products' });
   res.json(result);
 });
 
@@ -204,8 +208,6 @@ app.patch('/api/:shop/orders/:id', shopParam, requireSeller, async (req, res) =>
   const status = req.body?.status;
   if (!STATUSES.includes(status)) throw new HttpError(400, 'Unknown order status');
   await rpc('update_order_status', { p_shop: req.params.shop, p_id: Number(req.params.id), p_status: status });
-  broadcast(req.params.shop, { type: 'products' });
-  broadcast(req.params.shop, { type: 'orders' });
   res.json({ ok: true });
 });
 
@@ -225,7 +227,7 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`C.A.Q Cafe & Boutique running at http://localhost:${PORT} (database: ${mode})`);
+    console.log(`Sufi Amanda Cafe & Boutique running at http://localhost:${PORT} (database: ${mode})`);
     console.log(`  Boutique shop:   http://localhost:${PORT}/boutique`);
     console.log(`  Boutique seller: http://localhost:${PORT}/boutique/seller`);
     console.log(`  Cafe menu:       http://localhost:${PORT}/cafe`);
