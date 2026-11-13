@@ -1,18 +1,20 @@
 {
-  "name": "sufi-amanda",
+  "name": "caq-cafe-boutique",
   "version": "0.1.0",
-  "description": "Sufi Amanda cafe and boutique ordering system with seller dashboards (COD only, RM pricing)",
+  "description": "Cafe and boutique ordering system with seller dashboards (COD only, RM pricing)",
   "main": "server.js",
   "scripts": {
-    "start": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning server.js",
-    "dev": "node --env-file-if-exists=.env --watch --disable-warning=ExperimentalWarning server.js"
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js"
   },
   "dependencies": {
-    "express": "^4.22.3",
-    "multer": "^2.5.0"
+    "@supabase/supabase-js": "^2.119.0",
+    "express": "^5.3.0",
+    "multer": "^2.5.0",
+    "pg": "^8.23.1"
   },
   "private": true,
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.9"
   }
 }
