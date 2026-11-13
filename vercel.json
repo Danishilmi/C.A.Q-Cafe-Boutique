@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/boutique", "destination": "/customer.html" },
+    { "source": "/cafe", "destination": "/customer.html" },
+    { "source": "/boutique/seller", "destination": "/seller.html" },
+    { "source": "/cafe/seller", "destination": "/seller.html" },
+    { "source": "/api/(.*)", "destination": "/api" }
+  ]
+}

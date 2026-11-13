@@ -25,8 +25,12 @@ function findVariant(variantId) {
   return null;
 }
 
+let lastJson = '';
 async function load() {
   const data = await api('/products');
+  const json = JSON.stringify(data);
+  if (json === lastJson) return; // nothing changed, keep the page as it is
+  lastJson = json;
   products = data.products;
   const banner = document.getElementById('storeBanner');
   const sd = data.storeDiscount;
@@ -168,5 +172,5 @@ form.addEventListener('submit', async (e) => {
   } finally { btn.disabled = false; }
 });
 
-subscribe((ev) => { if (ev.type === 'products') load(); });
+poll(() => load().catch(() => {}), 5000);
 load().catch((err) => { document.getElementById('products').innerHTML = `<p class="error">${esc(err.message)}</p>`; });

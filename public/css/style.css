@@ -116,6 +116,34 @@ dialog::backdrop { background: rgb(0 0 0 / .4); }
 @media (max-width: 600px) {
   .two, .profile, .home-grid { grid-template-columns: 1fr; }
   .grid { grid-template-columns: repeat(2, 1fr); gap: .6rem; padding: .6rem; }
+  .card .body { padding: .6rem; }
+  .card h3 { font-size: 1rem; }
+  .price s { display: block; }
   .orders { grid-template-columns: 1fr; }
+  .topbar { padding: .6rem .75rem; }
+  .topbar .row { flex-shrink: 0; }
+  .tabs { padding: 0 .25rem; }
+  .tabs button { flex: 1; padding: .7rem .4rem; font-size: .9rem; }
+  .panel { padding: .75rem; }
+  .drawer-panel { padding: .75rem; }
+  .cart-row { flex-wrap: wrap; }
+  .cart-row .grow { min-width: calc(100% - 60px); }
+  .cart-row .qty { margin-left: 60px; }
+  .cart-row .right { margin-left: auto; font-weight: 600; }
+  dialog { padding: 1rem; width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); }
+  .row.end .btn { flex: 1; justify-content: center; }
+
+  /* Seller product list: one card per product instead of a wide table */
+  #productTable thead { display: none; }
+  #productTable, #productTable tbody { display: block; }
+  #productTable tr { display: grid; grid-template-columns: 56px 1fr auto; column-gap: .7rem; row-gap: .3rem; padding: .75rem; border-bottom: 1px solid var(--line); }
+  #productTable td { padding: 0; border: 0; }
+  #productTable .c-img { grid-row: 1 / span 3; }
+  #productTable .c-name { grid-column: 2; }
+  #productTable .c-price { grid-column: 3; text-align: right; }
+  #productTable .c-disc { grid-column: 2 / span 2; font-size: .85rem; }
+  #productTable .c-disc.none, #productTable .c-total { display: none; }
+  #productTable .c-var { grid-column: 2 / span 2; }
+  #productTable .c-act { grid-column: 1 / -1; display: flex; gap: .5rem; justify-content: flex-end; padding-top: .3rem; }
 }
 select#orderFilter { width: auto; }

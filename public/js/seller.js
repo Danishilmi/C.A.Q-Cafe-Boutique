@@ -31,7 +31,7 @@ function showLogin() {
 async function showApp() {
   document.getElementById('login').hidden = true;
   document.getElementById('app').hidden = false;
-  await Promise.all([loadProducts(), loadOrders()]);
+  await Promise.all([loadProducts(), loadOrders(), refresh()]);
 }
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -65,13 +65,13 @@ async function loadProducts() {
   if (products.length === 0) { t.innerHTML = `<tr><td class="muted">No ${CONFIG.itemWord}s yet. Click “Add ${CONFIG.itemWord}” to start.</td></tr>`; return; }
   t.innerHTML = `<thead><tr><th></th><th>Name</th><th>Price</th><th>Discount</th><th>${CONFIG.variantLabel}s (stock)</th><th>Total stock</th><th></th></tr></thead><tbody>` +
     products.map((p) => `<tr>
-      <td>${p.image ? `<img class="thumb" src="${esc(p.image)}" alt="">` : '<div class="thumb"></div>'}</td>
-      <td><strong>${esc(p.name)}</strong><div class="muted small">${esc(p.category)}</div></td>
-      <td>${rm(p.final_price_sen)}${p.final_price_sen < p.price_sen ? `<div class="muted small"><s>${rm(p.price_sen)}</s></div>` : ''}</td>
-      <td>${p.applied_discount ? `${discountLabel(p.applied_discount)}<div class="muted small">${p.applied_discount.source === 'store' ? 'all products' : 'this product'}</div>` : '—'}</td>
-      <td>${p.variants.map((v) => `<span class="pill ${v.stock === 0 ? 'out' : v.stock <= 3 ? 'low' : ''}">${esc(v.name)}: ${v.stock}</span>`).join(' ')}</td>
-      <td>${p.total_stock}</td>
-      <td class="right nowrap"><button class="btn ghost small" data-edit="${p.id}">Edit</button> <button class="btn ghost small danger" data-del="${p.id}">Remove</button></td>
+      <td class="c-img">${p.image ? `<img class="thumb" src="${esc(p.image)}" alt="">` : '<div class="thumb"></div>'}</td>
+      <td class="c-name"><strong>${esc(p.name)}</strong><div class="muted small">${esc(p.category)}</div></td>
+      <td class="c-price nowrap">${rm(p.final_price_sen)}${p.final_price_sen < p.price_sen ? `<div class="muted small"><s>${rm(p.price_sen)}</s></div>` : ''}</td>
+      <td class="c-disc ${p.applied_discount ? '' : 'none'}">${p.applied_discount ? `${discountLabel(p.applied_discount)}<div class="muted small">${p.applied_discount.source === 'store' ? 'all products' : 'this product'}</div>` : '—'}</td>
+      <td class="c-var">${p.variants.map((v) => `<span class="pill ${v.stock === 0 ? 'out' : v.stock <= 3 ? 'low' : ''}">${esc(v.name)}: ${v.stock}</span>`).join(' ')}</td>
+      <td class="c-total">${p.total_stock}</td>
+      <td class="c-act right nowrap"><button class="btn ghost small" data-edit="${p.id}">Edit</button> <button class="btn ghost small danger" data-del="${p.id}">Remove</button></td>
     </tr>`).join('') + '</tbody>';
 }
 
@@ -119,6 +119,20 @@ document.getElementById('imageInput').addEventListener('change', (e) => {
   if (f) { prev.src = URL.createObjectURL(f); prev.hidden = false; }
 });
 
+// Phone cameras take large photos. Scale them down to at most 1600px and save as JPEG,
+// so uploads are quick and stay under the hosting size limit.
+async function shrinkImage(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 1.5e6) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    return await new Promise((ok) => canvas.toBlob((b) => ok(b || file), 'image/jpeg', 0.85));
+  } catch { return file; }
+}
+
 pform.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(pform);
@@ -128,7 +142,9 @@ pform.addEventListener('submit', async (e) => {
     stock: r.querySelector('[data-f=stock]').value,
   }));
   fd.set('variants', JSON.stringify(variants));
-  if (!fd.get('image')?.size) fd.delete('image');
+  const img = fd.get('image');
+  if (!img?.size) fd.delete('image');
+  else fd.set('image', await shrinkImage(img), 'photo.jpg');
   const id = fd.get('id'); fd.delete('id');
   try {
     await sapi(id ? `/products/${id}` : '/products', { method: id ? 'PUT' : 'POST', body: fd });
@@ -172,9 +188,9 @@ async function loadOrders() {
         ${o.method === 'delivery' ? `<div class="wide"><span class="muted small">Location</span><div>${esc(o.address || '')}${mapUrl ? ` <a href="${mapUrl}" target="_blank">Open in Google Maps ↗</a>` : ''}${o.lat != null ? ' <span class="muted small">(GPS pin shared)</span>' : ''}</div></div>` : ''}
         ${o.notes ? `<div class="wide"><span class="muted small">Notes</span><div>${esc(o.notes)}</div></div>` : ''}
       </div>
-      <table class="table compact">${o.items.map((i) => `<tr><td>${esc(i.product_name)} <span class="muted small">(${esc(i.variant_name)})</span></td><td>× ${i.qty}</td><td class="right">${rm(i.unit_price_sen * i.qty)}</td></tr>`).join('')}
-        ${o.discount_sen ? `<tr class="muted"><td colspan="2">Discount</td><td class="right">− ${rm(o.discount_sen)}</td></tr>` : ''}
-        <tr><td colspan="2"><strong>Total to collect (COD)</strong></td><td class="right"><strong>${rm(o.total_sen)}</strong></td></tr></table>
+      <table class="table compact">${o.items.map((i) => `<tr><td>${esc(i.product_name)} <span class="muted small">(${esc(i.variant_name)})</span></td><td class="nowrap">× ${i.qty}</td><td class="right nowrap">${rm(i.unit_price_sen * i.qty)}</td></tr>`).join('')}
+        ${o.discount_sen ? `<tr class="muted"><td colspan="2">Discount</td><td class="right nowrap">− ${rm(o.discount_sen)}</td></tr>` : ''}
+        <tr><td colspan="2"><strong>Total to collect (COD)</strong></td><td class="right nowrap"><strong>${rm(o.total_sen)}</strong></td></tr></table>
       <div class="row end">${(STATUS_ACTIONS[o.status] || []).map(([s, label]) => `<button class="btn ${s === 'cancelled' ? 'ghost danger' : 'primary'} small" data-order="${o.id}" data-status="${s}">${label}</button>`).join('')}</div>
     </article>`;
   }).join('');
@@ -228,10 +244,20 @@ document.getElementById('storeDiscount').addEventListener('submit', async (e) =>
 });
 
 // ---------- live updates ----------
-subscribe((ev) => {
+let lastOrderId = null;
+async function refresh() {
   if (!token) return;
-  if (ev.type === 'orders') { loadOrders(); if (currentTab === 'sales') loadSales(); if (ev.newOrder) toast(`New order #${ev.newOrder} received`); }
-  if (ev.type === 'products') loadProducts();
-});
+  try {
+    const { orders } = await sapi('/orders');
+    const newest = orders[0]?.id ?? 0;
+    if (lastOrderId !== null && newest > lastOrderId) toast(`New order #${newest} received`);
+    const changed = lastOrderId !== null && newest !== lastOrderId;
+    lastOrderId = newest;
+    if (changed || currentTab === 'orders') loadOrders();
+    if (currentTab === 'products') loadProducts();
+    if (changed && currentTab === 'sales') loadSales();
+  } catch {}
+}
+poll(refresh, 10000);
 
 if (token) showApp().catch(() => {}); else showLogin();
